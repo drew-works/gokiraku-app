@@ -1,0 +1,15 @@
+{
+  "name": "ごきらく亭 注文メモ",
+  "short_name": "ごきらく亭",
+  "start_url": "order.html",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#dc3545",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/5812/5812165.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
