@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ごきらく亭 - 店員用スキャンアプリ</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         body { font-family: sans-serif; text-align: center; background-color: #222; color: white; padding: 20px; }
-        #reader { width: 100%; max-width: 400px; margin: 0 auto; border-radius: 12px; overflow: hidden; }
+        #preview { width: 100%; max-width: 400px; border-radius: 12px; margin-top: 20px; transform: scaleX(1); }
         #result { margin-top: 20px; padding: 15px; background: white; color: black; border-radius: 8px; display: none; text-align: left; }
         .item-line { border-bottom: 1px dashed #ccc; padding: 5px 0; font-size: 18px; }
     </style>
@@ -15,15 +15,16 @@
 <body>
 
     <h2>📱 店員専用スキャン画面</h2>
-    <p style="color: #ccc;">お客さんのQRコードをカメラの枠内に収めてください</p>
+    <p>お客さんのQRコードをカメラにかざしてください</p>
 
-    <div id="reader"></div>
+    <video id="preview" playsinline></video>
     <div id="result"></div>
 
     <script>
+        const video = document.getElementById('preview');
         const resultDiv = document.getElementById('result');
         
-        // メニューの日本語対応表
+        // メニューの日本語マッピング表
         const menuNames = {
             'butatama': '王道 豚玉',
             'modanyaki': 'イカモダン焼き',
@@ -33,13 +34,59 @@
             'beer': '生ビール'
         };
 
-        // スキャンに成功した時の処理
-        function onScanSuccess(decodedText, decodedResult) {
-            // 何度も読み込まないように一旦スキャンをストップ
-            html5QrcodeScanner.clear();
+        // カメラの起動（Safari対策：明示的にaudioをfalseにし、playsinlineを徹底）
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
+        .then(stream => {
+            video.srcObject = stream;
+            video.setAttribute("playsinline", true);
+            video.play();
+            requestAnimationFrame(tick);
+        })
+        .catch(err => {
+            alert("カメラの起動に失敗しました。iPhoneの設定＞Safari＞カメラ が『許可』になっているか確認してください。");
+        });
+
+        // 最新のブラウザ内蔵スキャナー（爆速）が使えるか確認
+        const barcodeDetector = ('BarcodeDetector' in window) ? new BarcodeDetector({ formats: ['qr_code'] }) : null;
+
+        async function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                // 1. まずはスマホ内蔵の爆速スキャナーを試す
+                if (barcodeDetector) {
+                    try {
+                        const barcodes = await barcodeDetector.detect(video);
+                        if (barcodes.length > 0) {
+                            parseOrder(barcodes[0].rawValue);
+                            return; // 読み取れたらループを抜ける
+                        }
+                    } catch (e) { /* フォールバックへ */ }
+                }
+
+                // 2. 内蔵スキャナーがダメなら従来のjsQRでスキャン（LINEブラウザ用）
+                const canvas = document.createElement("canvas");
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+                if (code && code.data) {
+                    parseOrder(code.data);
+                    return; // 読み取れたらループを抜ける
+                }
+            }
+            // スキャンを繰り返す（LINE内でフリーズしないように微小なディレイを挟む）
+            setTimeout(() => { requestAnimationFrame(tick); }, 100);
+        }
+
+        // 注文データを解析して画面に表示する
+        function parseOrder(data) {
+            // バイブレーションで通知（スマホが対応していればブッと鳴る）
+            if (navigator.vibrate) navigator.vibrate(200);
 
             let html = "<h3 style='margin-top:0; color:#dc3545;'>🟢 注文を受信しました</h3>";
-            const items = decodedText.split(',');
+            const items = data.split(',');
             
             items.forEach(item => {
                 const [id, count] = item.split(':');
@@ -47,23 +94,16 @@
                 html += `<div class='item-line'><strong>${name}</strong> × ${count}つ</div>`;
             });
 
-            html += `<br><button onclick="location.reload()" style="width:100%; padding:12px; font-weight:bold; background:#28a745; color:white; border:none; border-radius:5px; font-size:16px;">次のスキャンへ</button>`;
+            html += `<br><button onclick="location.reload()" style="width:100%; padding:10px; font-weight:bold; background:#28a745; color:white; border:none; border-radius:5px;">次のスキャンへ</button>`;
             
             resultDiv.innerHTML = html;
             resultDiv.style.display = "block";
-        }
-
-        // カメラの起動設定
-        const html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", 
-            { 
-                fps: 10,              // 1秒間に10回スキャンを試みる
-                qrbox: { width: 250, height: 250 }, // 読み取り用の四角い枠のサイズ
-                rememberLastUsedCamera: true
+            
+            // カメラを一旦ストップ
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
             }
-        );
-        
-        html5QrcodeScanner.render(onScanSuccess);
+        }
     </script>
 </body>
 </html>
