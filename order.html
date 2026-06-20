@@ -11,6 +11,7 @@
         :root { --primary-color: #dc3545; --bg-color: #f8f9fa; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); margin: 0; padding-bottom: 100px; color: #333; }
         .header { background: var(--primary-color); color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .table-number-display { background: #333; color: #fff; text-align: center; padding: 5px; font-size: 13px; font-weight: bold; }
         
         /* タブメニュー（横スクロール可能） */
         .tabs { display: flex; overflow-x: auto; background: white; border-bottom: 1px solid #ddd; position: sticky; top: 54px; z-index: 99; -webkit-overflow-scrolling: touch; }
@@ -47,6 +48,7 @@
 <body>
 
     <div class="header">ごきらく亭 スマホ注文</div>
+    <div class="table-number-display" id="table-display-bar">卓番号: 未設定 (URLを確認してください)</div>
 
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('okonomi')">お好み焼き</button>
@@ -73,7 +75,7 @@
 
     <div id="qrModal" class="modal">
         <div class="modal-content">
-            <h3 style="margin:0; color:#28a745;">【店員スキャン用画面】</h3>
+            <h3 style="margin:0; color:#28a745;" id="modal-table-title">【店員スキャン用画面】</h3>
             <p style="font-size:13px; color:#666; margin:5px 0 15px 0;">この画面をそのまま店員に見せてください</p>
             <div id="qrcode"></div>
             <button class="close-btn" onclick="closeQR()">画面を閉じる</button>
@@ -81,7 +83,12 @@
     </div>
 
     <script>
-        // --- 🍳 ごきらく亭 全メニューデータ（綺麗に6分割に仕分けました） ---
+        // --- 卓番号の自動取得 ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const tableNumber = urlParams.get('table') || '1'; // URLに無ければとりあえず1番卓にする
+        document.getElementById('table-display-bar').innerText = `お席: ${tableNumber}番卓`;
+        document.getElementById('modal-table-title').innerText = `【${tableNumber}番卓 注文用】`;
+
         const menuData = {
             okonomi: [
                 { id: 'o1', name: '紅しょうが天', price: 810 }, { id: 'o2', name: '桜エビ天', price: 860 },
@@ -216,7 +223,6 @@
         const selections = {};
         let qrcode = null;
 
-        // メニュー画面を組み立てる処理
         function initMenu() {
             for (const category in menuData) {
                 const container = document.getElementById(category);
@@ -240,31 +246,21 @@
             }
         }
 
-        // タブ切り替え処理
         function switchTab(categoryId) {
             document.querySelectorAll('.menu-container').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            
             document.getElementById(categoryId).classList.add('active');
             event.currentTarget.classList.add('active');
         }
 
-        // 数量のプラスマイナス処理
         function updateCount(id, change, price) {
             const current = selections[id] || 0;
             const next = Math.max(0, current + change);
-            
-            if (next === 0) {
-                delete selections[id];
-            } else {
-                selections[id] = next;
-            }
-            
+            if (next === 0) { delete selections[id]; } else { selections[id] = next; }
             document.getElementById(`count-${id}`).innerText = next;
             calculateTotal();
         }
 
-        // 合計金額の計算
         function calculateTotal() {
             let total = 0;
             for (const category in menuData) {
@@ -276,18 +272,15 @@
             document.getElementById('total-display').innerText = total.toLocaleString();
         }
 
-        // QRコード生成画面を出す
         function showQR() {
             const keys = Object.keys(selections);
-            if (keys.length === 0) {
-                alert('メニューを選択してください！');
-                return;
-            }
+            if (keys.length === 0) { alert('メニューを選択してください！'); return; }
 
-            const qrText = keys.map(id => `${id}:${selections[id]}`).join(',');
+            // 頭に「T番号,」をつけて、店員画面に卓番号を伝えるようにします
+            // 例: "T3,o15:1,d2:2"
+            const qrText = `T${tableNumber},` + keys.map(id => `${id}:${selections[id]}`).join(',');
 
             document.getElementById('qrModal').style.display = 'flex';
-            
             const qrContainer = document.getElementById("qrcode");
             qrContainer.innerHTML = ""; 
             
@@ -299,10 +292,7 @@
             });
         }
 
-        function closeQR() {
-            document.getElementById('qrModal').style.display = 'none';
-        }
-
+        function closeQR() { document.getElementById('qrModal').style.display = 'none'; }
         initMenu();
     </script>
 </body>
