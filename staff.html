@@ -152,7 +152,7 @@
         </div>
     </div>
 
-    <button class="scan-trigger-btn" onclick="openScanner()">📷</button>
+    <button class="scan-trigger-btn" onclick="openScannerWithLog()">📷</button>
 
     <div id="scanModal" class="modal">
         <h3 style="margin: 0 0 5px 0;">QRコードをスキャン</h3>
@@ -174,8 +174,7 @@
             <div class="custom-confirm-title" id="confirmTitle">確認</div>
             <div class="custom-confirm-msg" id="confirmMsg">本当にリセットしますか？</div>
             <div class="custom-confirm-btns">
-                <button class="scan-trigger-btn" onclick="openScanner()">📷</button>
-                <button class="scan-trigger-btn" onclick="openScannerWithLog()">📷</button>
+                <button class="custom-confirm-btn no" onclick="closeConfirm(false)">いいえ</button>
                 <button class="custom-confirm-btn yes" id="confirmYesBtn">はい</button>
             </div>
         </div>
