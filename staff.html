@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ごきらく亭 - 店員用総合管理アプリ</title>
-    <!-- QRコードデコードライブラリ -->
     <script src="jsQR.js"></script>
     <style>
         :root { --primary-color: #28a745; --dark-bg: #222; }
@@ -153,27 +152,21 @@
         </div>
     </div>
 
-    <!-- カメラ起動ボタン -->
     <button class="scan-trigger-btn" onclick="openScanner()">📷</button>
 
-    <!-- スキャンモーダル -->
     <div id="scanModal" class="modal">
         <h3 style="margin: 0 0 5px 0;">QRコードをスキャン</h3>
         <p style="font-size:13px; color:#ccc; margin: 0 0 15px 0;">スキャンすると自動で該当の卓に注文が入ります</p>
         
-        <!-- ビデオ要素 -->
         <video id="video" style="display:none;" playsinline muted></video>
         
-        <!-- キャンバス描画 -->
         <canvas id="canvas"></canvas>
         
-        <!-- ステータスメッセージ表示 -->
         <div id="camera-status-msg">カメラを起動中...</div>
         
         <button class="close-modal" onclick="closeScanner()">キャンセル</button>
     </div>
 
-    <!-- 標準ダイアログを置き換えるトースト&確認モーダルのHTML要素 -->
     <div id="toast" class="custom-toast">注文を追加しました！</div>
     
     <div id="confirmOverlay" class="custom-confirm-overlay">
@@ -187,7 +180,6 @@
         </div>
     </div>
 
-    <!-- 各機能ファイルの読み込み -->
     <script src="order-menu-data.js"></script>
     <script src="staff-logic.js"></script>
     <script src="staff-scanner.js"></script>
