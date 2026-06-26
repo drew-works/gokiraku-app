@@ -1,15 +1,16 @@
 {
-  "name": "ごきらく亭 注文メモ",
-  "short_name": "ごきらく亭",
-  "start_url": "order.html",
-  "display": "standalone",
-  "background_color": "#f8f9fa",
-  "theme_color": "#dc3545",
+  "short_name": "ごきらく注文",
+  "name": "ごきらく亭 スマホ注文システム",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/5812/5812165.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "../menu_main.jpg",
+      "type": "image/jpeg",
+      "sizes": "512x512"
     }
-  ]
+  ],
+  "start_url": "order.html",
+  "background_color": "#dc3545",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#dc3545"
 }

@@ -6,294 +6,79 @@
     <title>ごきらく亭 - スマホ注文</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="stylesheet" href="order-style.css">
     <script src="qrcode.min.js"></script>
-    <style>
-        :root { --primary-color: #dc3545; --bg-color: #f8f9fa; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); margin: 0; padding-bottom: 100px; color: #333; }
-        .header { background: var(--primary-color); color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .table-number-display { background: #333; color: #fff; text-align: center; padding: 5px; font-size: 13px; font-weight: bold; }
-        
-        /* タブメニュー（横スクロール可能） */
-        .tabs { display: flex; overflow-x: auto; background: white; border-bottom: 1px solid #ddd; position: sticky; top: 54px; z-index: 99; -webkit-overflow-scrolling: touch; }
-        .tab-btn { flex: 0 0 auto; padding: 12px 15px; text-align: center; background: none; border: none; font-size: 14px; font-weight: bold; color: #666; cursor: pointer; white-space: nowrap; }
-        .tab-btn.active { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); }
-        
-        /* メニューエリア */
-        .menu-container { padding: 10px; display: none; }
-        .menu-container.active { display: block; }
-        .menu-item { display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px; margin-bottom: 8px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .item-info { flex: 1; }
-        .item-name { font-weight: bold; font-size: 15px; margin-bottom: 4px; }
-        .item-price { color: #666; font-size: 13px; }
-        
-        /* カウンターボタン */
-        .counter { display: flex; align-items: center; gap: 12px; }
-        .btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid #ccc; background: white; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .btn-minus { color: #666; }
-        .btn-plus { background: var(--primary-color); color: white; border: none; }
-        .count { font-size: 16px; font-weight: bold; min-width: 15px; text-align: center; }
-        
-        /* 注文フッター */
-        .footer { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; z-index: 100; }
-        .total-price { font-size: 18px; font-weight: bold; }
-        .order-btn { background: #28a745; color: white; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 25px; cursor: pointer; box-shadow: 0 3px 6px rgba(40,167,69,0.3); }
-        
-        /* モーダル */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 20px; border-radius: 12px; text-align: center; width: 85%; max-width: 340px; box-sizing: border-box; }
-        #qrcode { margin: 20px auto; display: flex; justify-content: center; }
-        .close-btn { background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; margin-top: 10px; width: 100%; }
-    </style>
 </head>
 <body>
 
     <div class="header">ごきらく亭 スマホ注文</div>
     <div class="table-number-display" id="table-display-bar">卓番号: 未設定 (URLを確認してください)</div>
 
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('okonomi')">お好み焼き</button>
-        <button class="tab-btn" onclick="switchTab('monja')">もんじゃ焼き</button>
-        <button class="tab-btn" onclick="switchTab('teppan')">鉄板焼き</button>
-        <button class="tab-btn" onclick="switchTab('otsumami')">おつまみ</button>
-        <button class="tab-btn" onclick="switchTab('salad')">サラダ</button>
-        <button class="tab-btn" onclick="switchTab('drink')">ドリンク</button>
-        <button class="tab-btn" onclick="switchTab('dessert')">デザート</button>
+    <div class="tabs" id="tabs-container"></div>
+    <div id="menu-sections-container"></div>
+
+    <div class="footer" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; height: 60px;">
+        <div class="total-price" style="font-size: 16px;">選択中: <span id="items-count-display" style="font-weight:bold; color:#28a745; font-size:1.2em;">0</span> 品</div>
+        <button id="main-action-btn" class="order-btn" style="margin:0; background:#6c757d;" onclick="handleMainAction()">メニューを選んでください</button>
     </div>
 
-    <div id="okonomi" class="menu-container active"></div>
-    <div id="monja" class="menu-container"></div>
-    <div id="teppan" class="menu-container"></div>
-    <div id="otsumami" class="menu-container"></div>
-    <div id="salad" class="menu-container"></div>
-    <div id="drink" class="menu-container"></div>
-    <div id="dessert" class="menu-container"></div>
+    <div id="toppingModal" class="modal">
+        <div class="modal-content" style="max-height: 80vh; overflow-y: auto; text-align: left;">
+            <h3 style="margin:0; color:#333;" id="topping-modal-title">トッピングの追加</h3>
+            <p style="font-size:13px; color:#666; margin:5px 0 15px 0;">一緒に注文するトッピングを選んでください</p>
+            <div id="topping-list-container" style="margin-bottom: 20px;"></div>
+            <button class="order-btn" style="background:#28a745; width:100%; margin-bottom:10px;" onclick="closeToppingModal()">トッピングを確定する</button>
+        </div>
+    </div>
 
-    <div class="footer">
-        <div class="total-price">合計: ¥<span id="total-display">0</span></div>
-        <button class="order-btn" onclick="showQR()">注文QRを作る</button>
+    <div id="drinkModal" class="modal">
+        <div class="modal-content" style="max-height: 80vh; overflow-y: auto; text-align: left;">
+            <h3 style="margin:0; color:#333;" id="drink-modal-title">ドリンクの選択</h3>
+            <p style="font-size:13px; color:#666; margin:5px 0 15px 0;">サイズや種類を選んでください</p>
+            <div id="drink-list-container" style="margin-bottom: 20px;"></div>
+            <button class="order-btn" style="background:#28a745; width:100%; margin-bottom:10px;" onclick="closeDrinkModal()">メニューに戻る</button>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content" style="max-height: 80vh; overflow-y: auto; text-align: left;">
+            <h3 style="margin:0; color:#333;">注文内容の確認</h3>
+            <p style="font-size:13px; color:#666; margin:5px 0 15px 0;">ご注文内容にお間違いがないかご確認ください。</p>
+            
+            <div id="confirm-list-container" style="margin: 15px 0; border-top:1px solid #eee; border-bottom:1px solid #eee; padding:10px 0;"></div>
+            
+            <div style="font-size: 18px; font-weight: bold; text-align: right; margin-bottom: 20px;">
+                今回の小計: ¥<span id="confirm-total-display">0</span>
+            </div>
+
+            <button class="order-btn" style="background:#28a745; width:100%; margin-bottom:10px;" onclick="generateOrderQR()">この内容で注文（QR作成）</button>
+            <button class="close-btn" style="width:100%; background:#6c757d;" onclick="closeConfirmation()">修正する</button>
+        </div>
     </div>
 
     <div id="qrModal" class="modal">
         <div class="modal-content">
             <h3 style="margin:0; color:#28a745;" id="modal-table-title">【店員スキャン用画面】</h3>
             <p style="font-size:13px; color:#666; margin:5px 0 15px 0;">この画面をそのまま店員に見せてください</p>
-            <div id="qrcode"></div>
-            <button class="close-btn" onclick="closeQR()">画面を閉じる</button>
+            <div id="qrcode" style="display:flex; justify-content:center; margin:15px 0;"></div>
+            <button class="close-btn" onclick="closeQRAndReset()">画面を閉じる</button>
         </div>
     </div>
 
-    <script>
-        // --- 卓番号の自動取得 ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const tableNumber = urlParams.get('table') || '1'; // URLに無ければとりあえず1番卓にする
-        document.getElementById('table-display-bar').innerText = `お席: ${tableNumber}番卓`;
-        document.getElementById('modal-table-title').innerText = `【${tableNumber}番卓 注文用】`;
-
-        const menuData = {
-            okonomi: [
-                { id: 'o1', name: '紅しょうが天', price: 810 }, { id: 'o2', name: '桜エビ天', price: 860 },
-                { id: 'o3', name: '納豆天', price: 880 }, { id: 'o4', name: 'ねぎ天', price: 880 },
-                { id: 'o5', name: '切イカ天', price: 920 }, { id: 'o6', name: 'ツナ天', price: 920 },
-                { id: 'o7', name: '豚天', price: 920 }, { id: 'o8', name: 'ギョーザ天', price: 920 },
-                { id: 'o9', name: '牛天(和牛)', price: 990 }, { id: 'o10', name: '三色天(桜エビ・切イカ・紅しょうが)', price: 990 },
-                { id: 'o11', name: '長ネギ天(ちぢみ風)', price: 990 }, { id: 'o12', name: 'タコ天', price: 1020 },
-                { id: 'o13', name: '生イカ天', price: 1020 }, { id: 'o14', name: '生エビ天', price: 1020 },
-                { id: 'o15', name: '豚ネギ天', price: 1020 }, { id: 'o16', name: 'ピザ天', price: 1060 },
-                { id: 'o17', name: 'カレー天', price: 1060 }, { id: 'o18', name: '明太子天', price: 1160 },
-                { id: 'o19', name: '豚キムチ天', price: 1180 }, { id: 'o20', name: 'しらす梅天(しらす・梅・大葉・ネギ)', price: 1180 },
-                { id: 'o21', name: 'モチチーズねぎ天', price: 1180 }, { id: 'o22', name: 'カープ天(広島風)※キムチ又は切イカ', price: 1190 },
-                { id: 'o23', name: 'カキ天(シーズン)', price: 1200 }, { id: 'o24', name: '豚チーズダブル天', price: 1240 },
-                { id: 'o25', name: '牛スジ天', price: 1380 }, { id: 'o26', name: 'MIX天(牛・豚・コーン)', price: 1560 },
-                { id: 'o27', name: 'ごきらく天(タコ・イカ・あさり・エビ)', price: 1560 }, { id: 'o28', name: 'シーフードピザ天', price: 1560 },
-                { id: 'o29', name: 'スタミナ天(大盛)(ニンニク・ニラ・牛・豚・切イカ・紅しょうが)', price: 1680 }
-            ],
-            monja: [
-                { id: 'm1', name: '納豆もんじゃ', price: 880 }, { id: 'm2', name: '紅しょうがもんじゃ', price: 810 },
-                { id: 'm3', name: 'コーンもんじゃ', price: 880 }, { id: 'm4', name: 'そばもんじゃ', price: 880 },
-                { id: 'm5', name: '切イカもんじゃ', price: 920 }, { id: 'm6', name: 'ベビースターもんじゃ', price: 870 },
-                { id: 'm7', name: 'ツナもんじゃ', price: 920 }, { id: 'm8', name: 'キムチもんじゃ', price: 920 },
-                { id: 'm9', name: 'チーズもんじゃ', price: 920 }, { id: 'm10', name: '生イカもんじゃ', price: 1020 },
-                { id: 'm11', name: '生エビもんじゃ', price: 1020 }, { id: 'm12', name: 'タコもんじゃ', price: 1020 },
-                { id: 'm13', name: '塩辛もんじゃ', price: 1020 }, { id: 'm14', name: 'もちチーズもんじゃ', price: 1050 },
-                { id: 'm15', name: 'カレーもんじゃ', price: 1080 }, { id: 'm16', name: 'ツナチーズもんじゃ', price: 1160 },
-                { id: 'm17', name: '明太子もんじゃ', price: 1160 }, { id: 'm18', name: '激辛もんじゃ', price: 1180 },
-                { id: 'm19', name: 'カレーうどんもんじゃ', price: 1190 }, { id: 'm20', name: 'もちチーズせんべいもんじゃ', price: 1190 },
-                { id: 'm21', name: 'もち明太子もんじゃ', price: 1370 }, { id: 'm22', name: 'イタリアンもんじゃ(トマト・バジル・チーズ・バター)', price: 1370 },
-                { id: 'm23', name: '明太チーズもんじゃ', price: 1410 }, { id: 'm24', name: 'MIXもんじゃ(豚・牛・コーン)', price: 1560 },
-                { id: 'm25', name: 'ほうれん草もんじゃ(ベーコン・チーズ・バター)', price: 1580 }, { id: 'm26', name: 'もち明太子チーズもんじゃ', price: 1580 },
-                { id: 'm27', name: 'ごきらくもんじゃ(タコ・アサリ・切イカ・生イカ)', price: 1580 },
-                { id: 'r1', name: '海鮮リゾットもんじゃ(エビ・イカ・タコ・チーズ・バター・ライス)', price: 1760 }, { id: 'r2', name: '地中海リゾットもんじゃ(トマト・ツナ・レモン・チーズ・バター・ライス)', price: 1760 },
-                { id: 'r3', name: 'キノコとベーコンの白ワインリゾットもんじゃ', price: 1760 }, { id: 'r4', name: 'グリーンカレーリゾットもんじゃ', price: 1760 },
-                { id: 'r5', name: 'レッドカレーリゾットもんじゃ', price: 1760 }
-            ],
-            teppan: [
-                { id: 't1', name: 'アスパラバター', price: 590 }, { id: 't2', name: 'エリンギガーリック', price: 650 },
-                { id: 't3', name: 'さつまいもバター', price: 690 }, { id: 't4', name: '野菜盛', price: 830 },
-                { id: 't5', name: 'はんぺんバター', price: 810 }, { id: 't6', name: 'イカゲソバター', price: 810 },
-                { id: 't7', name: 'コーンじゃがバター', price: 850 }, { id: 't8', name: 'きのこバター', price: 920 },
-                { id: 't9', name: 'ベーコンじゃがバター', price: 880 }, { id: 't10', name: 'はんぺんチーズ', price: 950 },
-                { id: 't11', name: '鶏ももバター', price: 980 }, { id: 't12', name: '鶏ももバターガーリック', price: 1080 },
-                { id: 't13', name: '豚キムチ', price: 1080 }, { id: 't14', name: '豚カルビ', price: 1080 },
-                { id: 't15', name: '豚ロースバター', price: 1080 }, { id: 't16', name: 'ごきらくウインナー', price: 1080 },
-                { id: 't17', name: 'ごきらくチョリソー', price: 1080 }, { id: 't18', name: '生イカバター', price: 1230 },
-                { id: 't19', name: 'ホタテバター', price: 1230 }, { id: 't20', name: '生かきバター', price: 1230 },
-                { id: 't21', name: '貝柱バター', price: 1360 }, { id: 't22', name: '特選和牛カルビ', price: 1360 },
-                { id: 't23', name: '黒毛和牛ヒレステーキ', price: 1999 }, { id: 't24', name: '黒毛和牛サーロインステーキ', price: 1999 },
-                { id: 'y1', name: '焼きそば', price: 980 }, { id: 'y2', name: '焼きうどん', price: 980 },
-                { id: 'y3', name: 'カレー焼きそば', price: 990 }, { id: 'y4', name: 'ピリモツ焼きそば', price: 1280 },
-                { id: 'y5', name: '海鮮焼きそば(エビ・イカ・豚肉)', price: 1560 }, { id: 'y6', name: '海鮮塩焼きそば(塩だれ・エビ・イカ・タコ・豚肉・ネギ)', price: 1560 },
-                { id: 'g1', name: 'ライス', price: 280 }, { id: 'g2', name: 'キムチチャーハン', price: 960 },
-                { id: 'g3', name: 'ガーリックチャーハン', price: 1010 }, { id: 'g4', name: 'エビチャーハン(玉子付き)', price: 1090 },
-                { id: 'g5', name: 'そばチャーハン', price: 1090 }, { id: 'g6', name: '玉子', price: 100 }, { id: 'g7', name: 'マヨネーズ', price: 100 }
-            ],
-            otsumami: [
-                { id: 's1', name: '冷奴', price: 530 }, { id: 's2', name: 'お新香', price: 480 },
-                { id: 's3', name: '板わさ', price: 480 }, { id: 's4', name: 'もろきゅう', price: 490 },
-                { id: 's5', name: 'イカ塩辛', price: 490 }, { id: 's6', name: '梅タタキ', price: 490 },
-                { id: 's7', name: 'もずく酢', price: 490 }, { id: 's8', name: 'しらすおろし', price: 530 },
-                { id: 's9', name: '冷トマト', price: 530 }, { id: 's10', name: 'キムチ', price: 560 },
-                { id: 's11', name: '枝豆', price: 540 }, { id: 's12', name: 'ニンニクオイル', price: 530 },
-                { id: 's13', name: '牛すじ煮込', price: 650 }, { id: 's14', name: 'ピリ辛もつ焼', price: 650 },
-                { id: 's15', name: 'チャンジャ', price: 660 }, { id: 's16', name: 'タコチャンジャ', price: 670 },
-                { id: 's17', name: 'エビマヨ', price: 680 }, { id: 's18', name: 'エビのガーリック炒め', price: 690 },
-                { id: 's19', name: 'ナスとピーマンの辛味噌炒め', price: 660 }, { id: 's20', name: 'タコキムチ', price: 680 },
-                { id: 's21', name: '明太子', price: 710 }, { id: 's22', name: '豆腐ツナ', price: 710 }
-            ],
-            salad: [
-                { id: 'sd1', name: '水菜とカリカリベーコンサラダ', price: 660 }, { id: 'sd2', name: '大根サラダ', price: 720 },
-                { id: 'sd3', name: 'ツナサラダ', price: 720 }, { id: 'sd4', name: 'ほうれん草サラダ', price: 870 },
-                { id: 'sd5', name: 'じゃこサラダ', price: 990 }, { id: 'sd6', name: '豆腐とワカメサラダ', price: 990 },
-                { id: 'sd7', name: '豚しゃぶサラダ', price: 1090 }, { id: 'sd8', name: 'シーザーサラダ', price: 740 },
-                { id: 'sd9', name: 'ごきらくサラダ(炒めたナス・ししとう・大和芋)', price: 1390 }
-            ],
-            drink: [
-                { id: 'd1', name: '生ビール(グラス)', price: 600 }, { id: 'd2', name: '生ビール(中)', price: 760 },
-                { id: 'd3', name: 'アサヒスーパードライ(瓶)', price: 780 }, { id: 'd4', name: 'エビスビール(瓶)', price: 810 },
-                { id: 'd5', name: 'プレミアムモルツ(瓶)', price: 830 }, { id: 'd6', name: 'サッポロ赤ラベル(瓶)', price: 810 },
-                { id: 'd7', name: 'アサヒドライゼロ', price: 620 }, { id: 'd8', name: 'チューハイ', price: 670 },
-                { id: 'd9', name: 'ウメサワー', price: 670 }, { id: 'd10', name: 'レモンサワー', price: 670 },
-                { id: 'd11', name: '青リンゴサワー', price: 670 }, { id: 'd12', name: 'カルピスサワー', price: 670 },
-                { id: 'd13', name: 'ブルーサワー(カルピス+青リンゴ)', price: 670 }, { id: 'd14', name: 'ライムサワー', price: 670 },
-                { id: 'd15', name: 'シークァーサーサワー', price: 670 }, { id: 'd16', name: '生レモンサワー', price: 680 },
-                { id: 'd17', name: '生オレンジサワー', price: 680 }, { id: 'd18', name: '生グレープフルーツサワー', price: 700 },
-                { id: 'd19', name: 'ラムネサワー', price: 730 }, { id: 'd20', name: 'クリームソーダハイ', price: 760 },
-                { id: 'd21', name: 'ウーロンハイ(いいちこ)', price: 720 }, { id: 'd22', name: '緑茶ハイ(いいちこ)', price: 720 },
-                { id: 'd23', name: 'ジャスミンハイ(いいちこ)', price: 720 }, { id: 'd24', name: '梅酒', price: 720 },
-                { id: 'd25', name: 'グラスワイン(赤・白)', price: 650 }, { id: 'd26', name: 'チリ フランスワイン(赤・白)フルボトル', price: 3800 },
-                { id: 'd27', name: 'トリスハイボール', price: 560 }, { id: 'd28', name: 'ブラックニッカ', price: 560 },
-                { id: 'd29', name: 'ジムビーム', price: 620 }, { id: 'd30', name: '角ハイボール', price: 700 },
-                { id: 'd31', name: 'ターキー8年(バーボン)', price: 740 }, { id: 'd32', name: 'コークハイ', price: 740 },
-                { id: 'd33', name: 'ジンジャーハイ', price: 740 }, { id: 'd34', name: 'サントリーリザーブ', price: 740 },
-                { id: 'd35', name: '杏ソーダ割', price: 670 }, { id: 'd36', name: '梅酒ソーダ割', price: 670 },
-                { id: 'd37', name: '桃ソーダ割', price: 670 }, { id: 'd38', name: 'ライチソーダ割', price: 670 },
-                { id: 'd39', name: 'ゆずレモンはちみつソーダ割', price: 670 }, { id: 'd40', name: 'ジントニック', price: 670 },
-                { id: 'd41', name: 'カシスソーダ', price: 670 }, { id: 'd42', name: 'カシスウーロン', price: 670 },
-                { id: 'd43', name: 'カシスオレンジ', price: 720 }, { id: 'd44', name: '松竹梅 一合', price: 620 },
-                { id: 'd45', name: '松竹梅 二合', price: 1080 }, { id: 'd46', name: '菊水辛口(冷酒)', price: 1120 },
-                { id: 'd47', name: '黒霧島(芋)', price: 700 }, { id: 'd48', name: '白霧島(芋)', price: 700 },
-                { id: 'd49', name: '黒伊佐錦(芋)', price: 700 }, { id: 'd50', name: 'いいちこ(麦)', price: 700 },
-                { id: 'd51', name: '二階堂(麦)', price: 720 }, { id: 'd52', name: '赤霧島(芋)', price: 760 },
-                { id: 'd53', name: '鍛高譚(しそ)', price: 760 }, { id: 'd54', name: '琉球<泡盛新酒>', price: 760 },
-                { id: 'd55', name: '残波<泡盛古酒>', price: 760 }, { id: 'd56', name: '奄美の杜<黒糖>', price: 760 },
-                { id: 'd57', name: '吉四六(麦)', price: 790 }, { id: 'd58', name: '大魔王(芋)', price: 790 },
-                { id: 'd59', name: 'ジンロ(ボトル)', price: 3000 }, { id: 'd60', name: 'いいちこシルエット(ボトル)', price: 3900 },
-                { id: 'd61', name: '黒霧島(ボトル)', price: 3900 }, { id: 'd62', name: '黒伊佐錦 900ml(ボトル)', price: 4700 },
-                { id: 'd63', name: '吉四六 瓶(ボトル)', price: 4700 }, { id: 'd64', name: '吉四六 陶器(ボトル)', price: 4800 },
-                { id: 'd65', name: 'マッコリ グラス', price: 500 }, { id: 'd66', name: 'マッコリ ボトル', price: 2600 },
-                { id: 'd67', name: 'ミネラルウォーター', price: 390 }, { id: 'd68', name: 'コーヒー(アイス・ホット)', price: 390 },
-                { id: 'd69', name: 'ウーロン茶', price: 390 }, { id: 'd70', name: '玉露茶', price: 390 },
-                { id: 'd71', name: 'ジャスミン茶', price: 390 }, { id: 'd72', name: 'カルピス', price: 390 },
-                { id: 'd73', name: 'ラムネ', price: 480 }, { id: 'd74', name: '炭酸', price: 480 },
-                { id: 'd75', name: 'コーラ(瓶)', price: 600 }, { id: 'd76', name: 'バヤリースオレンジ(瓶)', price: 550 },
-                { id: 'd77', name: 'ジンジャーエール(瓶)', price: 550 }, { id: 'd78', name: 'こどもビール(瓶)', price: 560 },
-                { id: 'd79', name: 'クリームソーダ', price: 590 }, { id: 'd80', name: 'ロックセット', price: 250 },
-                { id: 'd81', name: 'お湯割セット', price: 250 }, { id: 'd82', name: 'ミネラルセット', price: 480 },
-                { id: 'd83', name: '炭酸セット', price: 580 }, { id: 'd84', name: 'ウーロンセット', price: 600 },
-                { id: 'd85', name: '緑茶セット', price: 600 }, { id: 'd86', name: 'ジャスミン茶セット', price: 600 },
-                { id: 'd87', name: '梅干し', price: 160 }, { id: 'd88', name: '高級梅干し', price: 270 }
-            ],
-            dessert: [
-                { id: 'z1', name: 'バニラアイス', price: 380 }, { id: 'z2', name: 'チョコかけアイス', price: 410 },
-                { id: 'z3', name: '黒みつアイス', price: 410 }, { id: 'z4', name: 'あんみつ', price: 680 },
-                { id: 'z5', name: 'クリームあんみつ', price: 860 }, { id: 'z6', name: 'あんこ巻', price: 790 },
-                { id: 'z7', name: '杏巻', price: 790 }, { id: 'z8', name: 'チョコレート巻', price: 790 }
-            ]
-        };
-
-        const selections = {};
-        let qrcode = null;
-
-        function initMenu() {
-            for (const category in menuData) {
-                const container = document.getElementById(category);
-                let html = '';
-                menuData[category].forEach(item => {
-                    html += `
-                        <div class="menu-item">
-                            <div class="item-info">
-                                <div class="item-name">${item.name}</div>
-                                <div class="item-price">¥${item.price.toLocaleString()}</div>
-                            </div>
-                            <div class="counter">
-                                <button class="btn btn-minus" onclick="updateCount('${item.id}', -1, ${item.price})">-</button>
-                                <span class="count" id="count-${item.id}">0</span>
-                                <button class="btn btn-plus" onclick="updateCount('${item.id}', 1, ${item.price})">+</button>
-                            </div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
-            }
-        }
-
-        function switchTab(categoryId) {
-            document.querySelectorAll('.menu-container').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById(categoryId).classList.add('active');
-            event.currentTarget.classList.add('active');
-        }
-
-        function updateCount(id, change, price) {
-            const current = selections[id] || 0;
-            const next = Math.max(0, current + change);
-            if (next === 0) { delete selections[id]; } else { selections[id] = next; }
-            document.getElementById(`count-${id}`).innerText = next;
-            calculateTotal();
-        }
-
-        function calculateTotal() {
-            let total = 0;
-            for (const category in menuData) {
-                menuData[category].forEach(item => {
-                    const count = selections[item.id] || 0;
-                    total += item.price * count;
-                });
-            }
-            document.getElementById('total-display').innerText = total.toLocaleString();
-        }
-
-        function showQR() {
-            const keys = Object.keys(selections);
-            if (keys.length === 0) { alert('メニューを選択してください！'); return; }
-
-            // 頭に「T番号,」をつけて、店員画面に卓番号を伝えるようにします
-            // 例: "T3,o15:1,d2:2"
-            const qrText = `T${tableNumber},` + keys.map(id => `${id}:${selections[id]}`).join(',');
-
-            document.getElementById('qrModal').style.display = 'flex';
-            const qrContainer = document.getElementById("qrcode");
-            qrContainer.innerHTML = ""; 
+    <div id="historyModal" class="modal">
+        <div class="modal-content" style="max-height: 80vh; overflow-y: auto; text-align: left;">
+            <h3 style="margin:0; color:#17a2b8;">これまでの注文履歴</h3>
+            <p style="font-size:13px; color:#666; margin:5px 0 15px 0;">これまでに注文が確定（QRスキャン）したメニューです。</p>
             
-            qrcode = new QRCode(qrContainer, {
-                text: qrText,
-                width: 200,
-                height: 200,
-                correctLevel: QRCode.CorrectLevel.M
-            });
-        }
+            <div id="history-list-container" style="margin: 15px 0; border-top:1px solid #eee; border-bottom:1px solid #eee; padding:10px 0;"></div>
 
-        function closeQR() { document.getElementById('qrModal').style.display = 'none'; }
-        initMenu();
-    </script>
+            <button class="close-btn" style="width:100%; background:#6c757d;" onclick="closeHistoryModal()">メニューに戻る</button>
+        </div>
+    </div>
+
+    <script src="order-menu-data.js"></script>
+    <script src="staff-reset.js"></script>
+    <script src="topping.js"></script>
+    <script src="order-script.js"></script>
 </body>
 </html>
