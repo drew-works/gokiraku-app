@@ -174,7 +174,8 @@
             <div class="custom-confirm-title" id="confirmTitle">確認</div>
             <div class="custom-confirm-msg" id="confirmMsg">本当にリセットしますか？</div>
             <div class="custom-confirm-btns">
-                <button class="custom-confirm-btn no" onclick="closeConfirm(false)">いいえ</button>
+                <button class="scan-trigger-btn" onclick="openScanner()">📷</button>
+                <button class="scan-trigger-btn" onclick="openScannerWithLog()">📷</button>
                 <button class="custom-confirm-btn yes" id="confirmYesBtn">はい</button>
             </div>
         </div>
@@ -185,8 +186,23 @@
     <script src="staff-scanner.js"></script>
     <script>
         // 起動時の初期化
-        initTabs();
-        renderHistory();
+        try {
+            initTabs();
+            renderHistory();
+            console.log("初期化に成功しました");
+        } catch(e) {
+            alert("初期化エラー: " + e.message);
+        }
+
+        // カメラ起動ボタンの動きをチェックする用に書き換え
+        function openScannerWithLog() {
+            console.log("カメラ起動ボタンが押されました");
+            if (typeof openScanner === 'function') {
+                openScanner();
+            } else {
+                alert("openScanner 関数が見つかりません。staff-scanner.js が読み込まれていない可能性があります。");
+            }
+        }
     </script>
 </body>
 </html>
