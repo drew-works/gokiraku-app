@@ -1,24 +1,30 @@
-// 注文処理・トッピング連動表示
+//注文処理
 let currentTable = 1;
 let allTablesData = JSON.parse(localStorage.getItem('gokiraku_tables_data')) || {};
+let confirmCallback = null; // 確認画面用のコールバック保持
 
-// マスターデータ（order-menu-data.js）からIDをもとに名前を引き出す共通関数
+// マスターデータ（order-menu-data.js）からIDを元に日本語名を取得
 function getItemName(id) {
-    // 1. トッピング専用マスター（popupTopping）から探す
+    // menuDataが万が一読み込まれていなかった場合の安全ガード
+    if (typeof menuData === 'undefined') {
+        return "商品 " + id;
+    }
+
+    // 1. トッピング専用マスタから探す
     if (menuData.popupTopping) {
         const foundTopping = menuData.popupTopping.find(t => t.id === id);
         if (foundTopping) return foundTopping.name;
     }
     
-    // 2. お酒詳細（drinkDetails）内のサブカテゴリーをすべて探す
+    // 2. アルコール詳細(drinkDetails)のサブカテゴリをすべて探す
     if (menuData.drinkDetails) {
-        for (const subCat in menuData.drinkDetails) {
-            const foundDrink = menuData.drinkDetails[subCat].find(d => d.id === id);
+        for (const catKey in menuData.drinkDetails) {
+            const foundDrink = menuData.drinkDetails[catKey].find(d => d.id === id);
             if (foundDrink) return foundDrink.name;
         }
     }
 
-    // 3. その他、通常のメインカテゴリー（okonomi, monja, teppan 等）から探す
+    // 3. その他、メインメニューカテゴリから探す
     for (const category in menuData) {
         if (Array.isArray(menuData[category])) {
             const found = menuData[category].find(item => item.id === id);
@@ -28,9 +34,11 @@ function getItemName(id) {
     return "不明 (" + id + ")";
 }
 
-// 卓切り替えタブの生成（1〜11番卓）
+// 卓切り替えタブ（1〜11番卓）を生成
 function initTabs() {
     const tabsContainer = document.getElementById('table-tabs');
+    if (!tabsContainer) return;
+    
     tabsContainer.innerHTML = '';
     for (let i = 1; i <= 11; i++) {
         const btn = document.createElement('button');
@@ -41,18 +49,24 @@ function initTabs() {
     }
 }
 
+// タブ切り替え処理
 function switchTable(tableNum) {
     currentTable = tableNum;
     document.querySelectorAll('.table-btn').forEach((btn, idx) => {
         btn.classList.toggle('active', (idx + 1) === currentTable);
     });
-    document.getElementById('current-table-title').innerText = `${currentTable}番卓 の注文履歴`;
+    const titleEl = document.getElementById('current-table-title');
+    if (titleEl) {
+        titleEl.innerText = `${currentTable}番卓 の注文履歴`;
+    }
     renderHistory();
 }
 
-// ⭐大改修：店員画面の注文履歴表示（トッピングを親メニューの下にぶら下げる）
+// 注文履歴を表示する（トッピングは親メニューの真下に段落下げしてセット化）
 function renderHistory() {
     const listContainer = document.getElementById('order-history-list');
+    if (!listContainer) return;
+    
     listContainer.innerHTML = '';
     const history = allTablesData[currentTable] || [];
     
@@ -61,15 +75,14 @@ function renderHistory() {
         return;
     }
 
-    // 厨房が見やすいように最新の注文を一番上（逆順）にする
+    // 厨房で見やすいよう、最新注文を一番上にする
     history.slice().reverse().forEach(item => {
-        // IDにアンダーバー「_」が含まれるトッピングデータは、大元のループでは一旦描画を飛ばす
-        if (item.id.includes('_')) return;
+        if (item.id.includes('_')) return; // トッピングレコードはメイン描画では飛ばす
 
         const row = document.createElement('div');
         row.className = 'order-row';
 
-        // ①親メニュー（もんじゃや焼きそば等）の表示ライン
+        // 親メニュー（もんじゃ、ビール等）の描画
         let innerHTML = `
             <div class="main-item-line">
                 <div class="order-info">
@@ -87,7 +100,7 @@ function renderHistory() {
             </div>
         `;
 
-        // ⭐②この親メニューに紐づくトッピングが、同じ履歴データ内にあるか探して真下に段落下げ追加
+        // トッピングを段落下げで追加
         history.forEach(subItem => {
             if (subItem.id.startsWith(`${item.id}_`)) {
                 innerHTML += `
@@ -103,6 +116,7 @@ function renderHistory() {
     });
 }
 
+// ステータス切り替え
 function toggleStatus(uniqueId, type) {
     const history = allTablesData[currentTable] || [];
     const item = history.find(i => i.uniqueId === uniqueId);
@@ -114,14 +128,58 @@ function toggleStatus(uniqueId, type) {
     }
 }
 
-function clearCurrentTable() {
-    if (confirm(`${currentTable}番卓のデータをすべて消去（お会計完了）しますか？`)) {
-        allTablesData[currentTable] = [];
-        saveData();
-        renderHistory();
+// フリーズしないカスタム確認ダイアログ表示用関数
+function showConfirm(title, msg, callback) {
+    const overlay = document.getElementById("confirmOverlay");
+    const titleEl = document.getElementById("confirmTitle");
+    const msgEl = document.getElementById("confirmMsg");
+    
+    if (!overlay) return;
+    
+    titleEl.innerText = title;
+    msgEl.innerText = msg;
+    confirmCallback = callback;
+    overlay.style.display = "flex";
+}
+
+// 確認ダイアログを閉じる処理
+function closeConfirm(isYes) {
+    const overlay = document.getElementById("confirmOverlay");
+    if (overlay) {
+        overlay.style.display = "none";
+    }
+    if (isYes && typeof confirmCallback === 'function') {
+        confirmCallback();
+    }
+    confirmCallback = null;
+}
+
+// 清算ボタンが押された時の処理
+function askClearCurrentTable() {
+    // 標準の confirm() を使わず、オリジナルの自作モーダルで確認する
+    showConfirm(
+        "卓データの清算",
+        `${currentTable}番卓のデータをすべて消去（お会計完了）しますか？`,
+        function() {
+            allTablesData[currentTable] = [];
+            saveData();
+            renderHistory();
+            if (typeof showToast === 'function') {
+                showToast(`${currentTable}番卓をリセットしました`);
+            }
+        }
+    );
+    
+    // モーダルの確定ボタンにイベントをバインド
+    const yesBtn = document.getElementById("confirmYesBtn");
+    if (yesBtn) {
+        yesBtn.onclick = function() {
+            closeConfirm(true);
+        };
     }
 }
 
+// ローカルストレージ保存
 function saveData() {
     localStorage.setItem('gokiraku_tables_data', JSON.stringify(allTablesData));
 }

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ごきらく亭 - 店員用総合管理アプリ</title>
+    <!-- QRコードデコードライブラリ -->
     <script src="jsQR.js"></script>
     <style>
         :root { --primary-color: #28a745; --dark-bg: #222; }
@@ -19,16 +20,17 @@
         .card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 15px; }
         .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 8px; margin-bottom: 12px; font-weight: bold; font-size: 18px; }
         
-        /* 注文履歴行の最新レイアウト */
+        /* 注文履歴レイアウト */
         .order-row { padding: 12px 0; border-bottom: 1px solid #edf2f7; }
         .order-row:last-child { border-bottom: none; }
         .main-item-line { display: flex; justify-content: space-between; align-items: center; }
         .order-info { flex: 1; font-weight: bold; font-size: 16px; }
         .order-time { font-size: 11px; color: #999; font-weight: normal; margin-top: 2px; }
         
-        /* ⭐トッピングを段落下げしてわかりやすくするデザイン */
+        /* トッピング表示（段落下げオレンジ） */
         .topping-line { font-size: 14px; color: #e67e22; margin: 6px 0 2px 20px; font-weight: bold; }
         
+        /* 状態ボタン */
         .status-actions { display: flex; gap: 6px; }
         .status-btn { border: none; padding: 8px 12px; font-size: 12px; font-weight: bold; border-radius: 6px; cursor: pointer; }
         .status-btn.todo { background: #fff5f5; color: #e53e3e; border: 1px solid #feb2b2; }
@@ -37,10 +39,102 @@
         .clear-btn { background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
         .empty-message { text-align: center; color: #999; padding: 30px 0; font-weight: bold; }
         
+        /* 右下のカメラ起動ボタン */
         .scan-trigger-btn { position: fixed; bottom: 20px; right: 20px; background: #007bff; color: white; border: none; width: 64px; height: 64px; border-radius: 50%; font-size: 24px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,123,255,0.4); cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; }
+        
+        /* スキャン用モーダル */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; padding: 20px; color: white; }
-        #canvas { width: 100%; max-width: 320px; background: #000; border-radius: 12px; }
+        #canvas { width: 100%; max-width: 320px; background: #222; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
         .close-modal { background: #6c757d; color: white; border: none; padding: 12px; width: 100%; max-width: 320px; border-radius: 6px; font-weight: bold; margin-top: 15px; cursor: pointer; font-size: 16px; }
+        
+        /* カメラ情報表示エリア */
+        #camera-status-msg { font-size: 12px; color: #aaa; margin-top: 10px; text-align: center; }
+
+        /* スマートフォンフリーズ防止用カスタムダイアログ&トーストCSS */
+        .custom-toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(40, 167, 69, 0.95);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 9999;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+            opacity: 0;
+            pointer-events: none;
+            font-size: 15px;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .custom-toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        .custom-toast.error-toast {
+            background: rgba(220, 53, 69, 0.95);
+        }
+
+        .custom-confirm-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 9998;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .custom-confirm-box {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            width: 100%;
+            max-width: 340px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            text-align: center;
+            color: #333;
+            animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .custom-confirm-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+        .custom-confirm-msg {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .custom-confirm-btns {
+            display: flex;
+            gap: 10px;
+        }
+        .custom-confirm-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 15px;
+            border: none;
+            cursor: pointer;
+        }
+        .custom-confirm-btn.yes {
+            background: #dc3545;
+            color: white;
+        }
+        .custom-confirm-btn.no {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
     </style>
 </head>
 <body>
@@ -53,26 +147,52 @@
         <div class="card">
             <div class="card-header">
                 <span id="current-table-title">1番卓 の注文履歴</span>
-                <button class="clear-btn" onclick="clearCurrentTable()">卓を清算(リセット)</button>
+                <button class="clear-btn" onclick="askClearCurrentTable()">卓を清算(リセット)</button>
             </div>
             <div id="order-history-list"></div>
         </div>
     </div>
 
+    <!-- カメラ起動ボタン -->
     <button class="scan-trigger-btn" onclick="openScanner()">📷</button>
 
+    <!-- スキャンモーダル -->
     <div id="scanModal" class="modal">
-        <h3 style="margin: 0 0 10px 0;">QRコードをスキャン</h3>
+        <h3 style="margin: 0 0 5px 0;">QRコードをスキャン</h3>
         <p style="font-size:13px; color:#ccc; margin: 0 0 15px 0;">スキャンすると自動で該当の卓に注文が入ります</p>
-        <video id="video" style="display:none;"></video>
+        
+        <!-- ビデオ要素 -->
+        <video id="video" style="display:none;" playsinline muted></video>
+        
+        <!-- キャンバス描画 -->
         <canvas id="canvas"></canvas>
+        
+        <!-- ステータスメッセージ表示 -->
+        <div id="camera-status-msg">カメラを起動中...</div>
+        
         <button class="close-modal" onclick="closeScanner()">キャンセル</button>
     </div>
 
-    <script src="order-menu-data.js"></script> <script src="staff-logic.js"></script>
+    <!-- 標準ダイアログを置き換えるトースト&確認モーダルのHTML要素 -->
+    <div id="toast" class="custom-toast">注文を追加しました！</div>
+    
+    <div id="confirmOverlay" class="custom-confirm-overlay">
+        <div class="custom-confirm-box">
+            <div class="custom-confirm-title" id="confirmTitle">確認</div>
+            <div class="custom-confirm-msg" id="confirmMsg">本当にリセットしますか？</div>
+            <div class="custom-confirm-btns">
+                <button class="custom-confirm-btn no" onclick="closeConfirm(false)">いいえ</button>
+                <button class="custom-confirm-btn yes" id="confirmYesBtn">はい</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 各機能ファイルの読み込み -->
+    <script src="order-menu-data.js"></script>
+    <script src="staff-logic.js"></script>
     <script src="staff-scanner.js"></script>
     <script>
-        // 初期起動処理
+        // 起動時の初期化
         initTabs();
         renderHistory();
     </script>
