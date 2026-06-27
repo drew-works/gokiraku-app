@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+<!-- 画面の見た目・レイアウトを変えたい時 -->
+ <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ごきらく亭 - 店員用総合管理アプリ</title>
-    <script src="jsQR.js"></script>
     <style>
         :root { --primary-color: #28a745; --dark-bg: #222; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding-bottom: 60px; }
@@ -12,13 +12,23 @@
         
         /* 卓選択タブ */
         .table-selector { display: flex; overflow-x: auto; background: white; padding: 10px; gap: 8px; border-bottom: 1px solid #ddd; position: sticky; top: 0; z-index: 10; }
-        .table-btn { flex: 0 0 auto; padding: 10px 16px; background: #e9ecef; border: 1px solid #ced4da; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 14px; }
-        .table-btn.active { background: #007bff; color: white; border-color: #007bff; }
+        .table-btn { flex: 0 0 auto; padding: 10px 16px; background: #e9ecef; border: 1px solid #ced4da; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 14px; transition: background-color 0.2s; }
+        .table-btn.active { background: #007bff !important; color: white !important; border-color: #007bff !important; }
+        
+        /* 全卓共通タブ専用のアクティブ色（赤） */
+        .table-btn.global-btn.active { background: #dc3545 !important; border-color: #dc3545 !important; color: white !important; }
+        
+        /* 未提供の商品がある卓のスタイル（薄い赤） */
+        .table-btn.has-todo { background: #ffccd5; color: #b7094c; border-color: #ffb3c1; }
         
         .container { padding: 15px; max-width: 600px; margin: 0 auto; }
         .card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 15px; }
         .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 8px; margin-bottom: 12px; font-weight: bold; font-size: 18px; }
         
+        /* 全卓共通リスト用のヘッダー色 */
+        .card-header.all-tables { border-bottom: 2px solid #dc3545; color: #dc3545; }
+        .table-badge { background: #dc3545; color: white; padding: 2px 8px; border-radius: 4px; font-size: 14px; margin-right: 6px; }
+
         /* 注文履歴レイアウト */
         .order-row { padding: 12px 0; border-bottom: 1px solid #edf2f7; }
         .order-row:last-child { border-bottom: none; }
@@ -26,7 +36,10 @@
         .order-info { flex: 1; font-weight: bold; font-size: 16px; }
         .order-time { font-size: 11px; color: #999; font-weight: normal; margin-top: 2px; }
         
-        /* トッピング表示（段落下げオレンジ） */
+        /* 値段表示のスタイル */
+        .item-price-tag { font-size: 14px; color: #666; font-weight: normal; margin-left: 8px; }
+        
+        /* トッピング表示（オレンジ色） */
         .topping-line { font-size: 14px; color: #e67e22; margin: 6px 0 2px 20px; font-weight: bold; }
         
         /* 状態ボタン */
@@ -46,95 +59,9 @@
         #canvas { width: 100%; max-width: 320px; background: #222; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
         .close-modal { background: #6c757d; color: white; border: none; padding: 12px; width: 100%; max-width: 320px; border-radius: 6px; font-weight: bold; margin-top: 15px; cursor: pointer; font-size: 16px; }
         
-        /* カメラ情報表示エリア */
         #camera-status-msg { font-size: 12px; color: #aaa; margin-top: 10px; text-align: center; }
-
-        /* スマートフォンフリーズ防止用カスタムダイアログ&トーストCSS */
-        .custom-toast {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%) translateY(-100px);
-            background: rgba(40, 167, 69, 0.95);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 30px;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            z-index: 9999;
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
-            opacity: 0;
-            pointer-events: none;
-            font-size: 15px;
-            text-align: center;
-            white-space: nowrap;
-        }
-        .custom-toast.show {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
-        }
-        .custom-toast.error-toast {
-            background: rgba(220, 53, 69, 0.95);
-        }
-
-        .custom-confirm-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 9998;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        .custom-confirm-box {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            width: 100%;
-            max-width: 340px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-            text-align: center;
-            color: #333;
-            animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        @keyframes popIn {
-            from { transform: scale(0.8); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-        .custom-confirm-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 12px;
-        }
-        .custom-confirm-msg {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 20px;
-            line-height: 1.5;
-        }
-        .custom-confirm-btns {
-            display: flex;
-            gap: 10px;
-        }
-        .custom-confirm-btn {
-            flex: 1;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: bold;
-            font-size: 15px;
-            border: none;
-            cursor: pointer;
-        }
-        .custom-confirm-btn.yes {
-            background: #dc3545;
-            color: white;
-        }
-        .custom-confirm-btn.no {
-            background: #e2e8f0;
-            color: #4a5568;
-        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
 <body>
 
@@ -144,64 +71,24 @@
 
     <div class="container">
         <div class="card">
-            <div class="card-header">
-                <span id="current-table-title">1番卓 の注文履歴</span>
-                <button class="clear-btn" onclick="askClearCurrentTable()">卓を清算(リセット)</button>
-            </div>
-            <div id="order-history-list"></div>
+            <div id="card-header-area" class="card-header"></div>
+            <div id="main-display-list"></div>
         </div>
     </div>
 
-    <button class="scan-trigger-btn" onclick="openScannerWithLog()">📷</button>
+    <button class="scan-trigger-btn" onclick="openScanner()">📷</button>
 
     <div id="scanModal" class="modal">
         <h3 style="margin: 0 0 5px 0;">QRコードをスキャン</h3>
         <p style="font-size:13px; color:#ccc; margin: 0 0 15px 0;">スキャンすると自動で該当の卓に注文が入ります</p>
-        
         <video id="video" style="display:none;" playsinline muted></video>
-        
         <canvas id="canvas"></canvas>
-        
         <div id="camera-status-msg">カメラを起動中...</div>
-        
         <button class="close-modal" onclick="closeScanner()">キャンセル</button>
-    </div>
-
-    <div id="toast" class="custom-toast">注文を追加しました！</div>
-    
-    <div id="confirmOverlay" class="custom-confirm-overlay">
-        <div class="custom-confirm-box">
-            <div class="custom-confirm-title" id="confirmTitle">確認</div>
-            <div class="custom-confirm-msg" id="confirmMsg">本当にリセットしますか？</div>
-            <div class="custom-confirm-btns">
-                <button class="custom-confirm-btn no" onclick="closeConfirm(false)">いいえ</button>
-                <button class="custom-confirm-btn yes" id="confirmYesBtn">はい</button>
-            </div>
-        </div>
     </div>
 
     <script src="order-menu-data.js"></script>
     <script src="staff-logic.js"></script>
     <script src="staff-scanner.js"></script>
-    <script>
-        // 起動時の初期化
-        try {
-            initTabs();
-            renderHistory();
-            console.log("初期化に成功しました");
-        } catch(e) {
-            alert("初期化エラー: " + e.message);
-        }
-
-        // カメラ起動ボタンの動きをチェックする用に書き換え
-        function openScannerWithLog() {
-            console.log("カメラ起動ボタンが押されました");
-            if (typeof openScanner === 'function') {
-                openScanner();
-            } else {
-                alert("openScanner 関数が見つかりません。staff-scanner.js が読み込まれていない可能性があります。");
-            }
-        }
-    </script>
 </body>
 </html>

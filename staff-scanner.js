@@ -1,5 +1,5 @@
-// 📋 staff-scanner.js - カメラ起動・フリーズ完全防止・スマートフォンダイアログロック対策
-
+// カメラ起動、QRコードの読み取り
+// カメラ・QRスキャン関連の変数
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -9,181 +9,88 @@ let isScanning = false;
 let streamRef = null;
 let animationFrameId = null;
 
-// カメラを安全に起動する関数
+// スキャナーを開く
 function openScanner() {
     document.getElementById('scanModal').style.display = 'flex';
     isScanning = true;
-    updateStatus("カメラにアクセスしています...");
+    statusMsg.innerText = "カメラにアクセスしています...";
 
-    // ①スマホ用の外カメラ優先の設定
-    const constraints = {
-        video: { facingMode: "environment" }
-    };
-
-    navigator.mediaDevices.getUserMedia(constraints)
-        .then(startStream)
-        .catch(err => {
-            console.warn("外カメラの起動に失敗。フロントカメラでの再試行を行います:", err);
-            // ②パソコンやインカメラのみの環境用
-            return navigator.mediaDevices.getUserMedia({ video: true });
-        })
-        .then(startStream)
-        .catch(err => {
-            console.error("すべてのカメラ起動に失敗しました:", err);
-            updateStatus("❌ カメラへのアクセスが許可されていないか、カメラが見つかりません。");
-            showToast("カメラを起動できませんでした", true);
-        });
-}
-
-function startStream(stream) {
-    streamRef = stream;
-    video.srcObject = stream;
-    video.setAttribute("playsinline", true); // iOS Safariでの全画面起動・フリーズを防止
-    
-    video.play()
-        .then(() => {
-            updateStatus("🟢 スキャン中... QRコードを枠内に写してください");
-            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+        .then(function(stream) {
+            streamRef = stream;
+            video.srcObject = stream;
+            video.setAttribute("playsinline", true);
+            video.play();
+            statusMsg.innerText = "スキャン中...";
             animationFrameId = requestAnimationFrame(tick);
         })
-        .catch(err => {
-            console.error("ビデオ再生エラー:", err);
-            updateStatus("❌ ビデオの再生に失敗しました。");
+        .catch(function(err) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function(stream) {
+                    streamRef = stream;
+                    video.srcObject = stream;
+                    video.setAttribute("playsinline", true);
+                    video.play();
+                    statusMsg.innerText = "スキャン中(インカメラ)...";
+                    animationFrameId = requestAnimationFrame(tick);
+                })
+                .catch(function(e) {
+                    statusMsg.innerText = "カメラを起動できませんでした。";
+                });
         });
 }
 
-// カメラを終了する関数
+// スキャナーを閉じる
 function closeScanner() {
     document.getElementById('scanModal').style.display = 'none';
     isScanning = false;
-    
-    if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-    }
-    
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
     if (streamRef) {
         streamRef.getTracks().forEach(track => track.stop());
         streamRef = null;
     }
-    
-    if (video) {
-        video.srcObject = null;
-    }
+    video.srcObject = null;
 }
 
-// 毎フレームの描画＆QRコードスキャン処理
+// 毎フレームの描画解析ループ
 function tick() {
     if (!isScanning) return;
-
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        if (video.videoWidth === 0 || video.videoHeight === 0) {
-            animationFrameId = requestAnimationFrame(tick);
-            return;
-        }
-
-        canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
-        // ビデオ映像をキャンバスに描画
+        canvas.width = video.videoWidth;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // スキャンレーザーアニメーションを描画
-        drawScanningLine();
-
-        try {
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            
-            if (typeof jsQR === 'function') {
-                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "dontInvert"
-                });
-
-                if (code && code.data) {
-                    isScanning = false;
-                    
-                    // 解析・データ保存処理で万が一エラーが起きてもフリーズさせない
-                    try {
-                        processOrderQR(code.data);
-                    } catch (err) {
-                        console.error("QRデータ解析中にクラッシュ:", err);
-                        showToast("QRコードのデータ構造が正しくありません", true);
-                    }
-                    
-                    closeScanner(); // スキャンが成功したら必ずカメラスレッドを安全に止める
-                    return;
-                }
-            } else {
-                updateStatus("⚠️ jsQRライブラリが読み込まれていません。");
+        
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        if (typeof jsQR === 'function') {
+            var code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert",
+            });
+            if (code) {
+                isScanning = false;
+                processOrderQR(code.data);
+                closeScanner();
+                return;
             }
-        } catch (e) {
-            console.error("QR解析中のエラー:", e);
         }
     }
-
     animationFrameId = requestAnimationFrame(tick);
 }
 
-// レーザーラインを描画
-function drawScanningLine() {
-    const time = Date.now() * 0.003;
-    const y = (Math.sin(time) * 0.5 + 0.5) * canvas.height;
-    
-    ctx.strokeStyle = "#28a745";
-    ctx.lineWidth = 4;
-    ctx.shadowColor = "#28a745";
-    ctx.shadowBlur = 10;
-    
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-}
-
-function updateStatus(text) {
-    if (statusMsg) {
-        statusMsg.innerText = text;
-    }
-}
-
-// スキャン完了トースト表示関数 (ノンブロッキングでフリーズを完全回避)
-function showToast(message, isError = false) {
-    const toast = document.getElementById("toast");
-    if (!toast) return;
-
-    toast.innerText = message;
-    if (isError) {
-        toast.classList.add("error-toast");
-    } else {
-        toast.classList.remove("error-toast");
-    }
-
-    toast.classList.add("show");
-
-    // 2.5秒後に自動で隠す
-    setTimeout(() => {
-        toast.classList.remove("show");
-    }, 2500);
-}
-
-// スキャン成功時の注文分解処理
+// 読み取ったQRテキストを解析して注文をデータに追加
 function processOrderQR(qrText) {
-    let targetTable = currentTable;
+    let targetTable = currentTable === 'all' ? 1 : currentTable;
     let menuParts = qrText;
 
     if (qrText.startsWith('T')) {
         const commaIndex = qrText.indexOf(',');
         if (commaIndex !== -1) {
             const tableStr = qrText.substring(1, commaIndex);
-            targetTable = parseInt(tableStr) || currentTable;
+            targetTable = parseInt(tableStr) || targetTable;
             menuParts = qrText.substring(commaIndex + 1);
         }
     }
 
-    if (!allTablesData[targetTable]) { 
-        allTablesData[targetTable] = []; 
-    }
+    if (!allTablesData[targetTable]) { allTablesData[targetTable] = []; }
 
     const now = new Date();
     const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -192,18 +99,12 @@ function processOrderQR(qrText) {
     items.forEach(itemStr => {
         const [id, count] = itemStr.split(":");
         if (id && count) {
-            let itemName = "";
-            if (id.includes('_')) {
-                const toppingId = id.split('_')[1];
-                itemName = getItemName(toppingId);
-            } else {
-                itemName = getItemName(id);
-            }
-
+            const itemInfo = getItemInfo(id); // staff-logic.jsの関数を使用
             const orderItem = {
                 uniqueId: targetTable + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
                 id: id,
-                name: itemName,
+                name: itemInfo.name,
+                price: itemInfo.price,
                 count: parseInt(count),
                 time: timeStr,
                 paperDone: false,
@@ -213,9 +114,9 @@ function processOrderQR(qrText) {
         }
     });
 
-    saveData();
-    switchTable(targetTable); // 自動的に、注文が入った卓にタブを切り替え
+    saveData(); // staff-logic.jsの関数を使用
     
-    // 標準alertは絶対に使わず、トースト通知で完了を知らせる
-    showToast(`${targetTable}番卓に注文を追加しました！`);
+    // 今開いている画面のままリストを再描画
+    switchTable(currentTable); 
+    alert(`注文を自動振り分けで追加しました！`);
 }
